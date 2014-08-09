@@ -1,29 +1,22 @@
-#!/bin/sh
-#
-# Move the current window to the next monitor.
-#
-# Only works on a horizontal monitor setup.
-# Also works only on one X screen (which is the most common case).
-#
-# Props to
-# http://icyrock.com/blog/2012/05/xubuntu-moving-windows-between-monitors/
-#
-# Unfortunately, both "xdotool getwindowgeometry --shell $window_id" and
-# checking "-geometry" of "xwininfo -id $window_id" are not sufficient, as
-# the first command does not respect panel/decoration offsets and the second
-# will sometimes give a "-0-0" geometry. This is why we resort to "xwininfo".
+#!/bin/bash
 
+pattern='horz|vert|full' 
 screen_width=`xdpyinfo | awk '/dimensions:/ { print $2; exit }' | cut -d"x" -f1`
 display_width=`xdotool getdisplaygeometry | cut -d" " -f1`
 window_id=`xdotool getactivewindow`
-
-# Remember if it was maximized.
-window_state=`xprop -id $window_id _NET_WM_STATE | awk '{ print $3 }'`
-
-# Un-maximize current window so that we can move it
-wmctrl -ir $window_id -b remove,maximized_vert,maximized_horz
-
-# Read window position
+window_state=`xprop -id $window_id _NET_WM_STATE | sed 's/,//g' | cut -d ' ' -f3-`
+remember_states=""
+for w in $window_state
+do
+    #remove _NET_WM_STATE_ prefix
+    w=`echo $w | sed -r 's/^.{14}//' | awk '{print tolower($0)}'`
+    #echo $w
+    if [[ $w =~ $pattern ]]
+    then
+        wmctrl -ir $window_id -b remove,$w
+        remember_states="$remember_states $w"
+    fi
+done
 x=`xwininfo -id $window_id | awk '/Absolute upper-left X:/ { print $4 }'`
 y=`xwininfo -id $window_id | awk '/Absolute upper-left Y:/ { print $4 }'`
 
@@ -50,8 +43,8 @@ fi
 
 # Move the window
 xdotool windowmove $window_id $new_x $y
-
-# Maximize window again, if it was before
-if [ -n "${window_state}" ]; then
-  wmctrl -ir $window_id -b add,maximized_vert,maximized_horz
-fi
+for w in $remember_states
+do
+    wmctrl -ir $window_id -b add,$w
+done
+exit
