@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# This is based loosely on a script available here
+# This is based loosely on a script available here:
 #
+# http://makandracards.com/makandra/12447-how-to-move-a-window-to-the-next-monitor-on-xfce-xubuntu
 #
-#
-# Which was in turn based on one available here
+# Which was in turn based on one available here:
 #
 # http://icyrock.com/blog/2012/05/xubuntu-moving-windows-between-monitors/
 #
@@ -18,6 +18,9 @@ function index {
 
 
 # get monitor dimension information from monitors listed as 'connected' by xrandr
+# if for whatever reason this doesn't work, you can manually set widths and offsets.
+# if your screens (left to right) have widths W1, W2, W3, 
+# then you would set widths to "W1 W2 W3" and offsets to "0 W1 W2"
 widths=""
 offsets=""
 monitor_count=0
@@ -54,17 +57,17 @@ offsets=$ordered_offsets
 # store the windows maximized/fullscreen state information and undo all of it
 pattern='horz|vert|full' 
 window_id=`xdotool getactivewindow`
-window_state=`xprop -id $window_id _NET_WM_STATE | sed 's/,//g' | cut -d ' ' -f3-`
+window_states=`xprop -id $window_id _NET_WM_STATE | sed 's/,//g' | cut -d ' ' -f3-`
 remember_states=""
-for w in $window_state
+for state in $window_states
 do
     #remove _NET_WM_STATE_ prefix
-    w=`echo $w | sed -r 's/^.{14}//' | awk '{print tolower($0)}'`
+    state=`echo $state | sed -r 's/^.{14}//' | awk '{print tolower($0)}'`
     #echo $w
-    if [[ $w =~ $pattern ]]
+    if [[ $state =~ $pattern ]]
     then
-        wmctrl -ir $window_id -b remove,$w
-        remember_states="$remember_states $w"
+        wmctrl -ir $window_id -b remove,$state
+        remember_states="$remember_states $state"
     fi
 done
 
