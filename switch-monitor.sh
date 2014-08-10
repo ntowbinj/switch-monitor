@@ -1,8 +1,58 @@
 #!/bin/bash
+#
+# This is based loosely on a script available here
+#
+#
+#
+# Which was in turn based on one available here
+#
+# http://icyrock.com/blog/2012/05/xubuntu-moving-windows-between-monitors/
+#
+# Neither of which worked quite right with fullscreen (distinct from maximized) windows
 
+
+# since cut indexes from 1, pretty much everything in this script will too
+function index {
+    echo `echo $1 | cut -d"$2" -f$3` 
+}
+
+
+# get monitor dimension information from monitors listed as 'connected' by xrandr
+widths=""
+offsets=""
+monitor_count=0
+while read -r line
+do
+    info=`echo $line | sed -n 's/.* \([0-9]*x[0-9]*+[0-9]*+[0-9]*\).*/\1/p'`
+    widths="$widths $(index $info 'x' 1)"
+    offsets="$offsets $(index $info '+' 2)"
+    ((monitor_count++))
+done < <(xrandr --current | grep ' connected')
+
+
+# put them in left-right order--computationally inefficient selection sort, but you probably don't have 100000 monitors
+start=0
+ordered_widths=""
+ordered_offsets=""
+for i in $(seq 1 $monitor_count)
+do
+    for j in $(seq 1 $monitor_count)
+    do
+        width=$(index "$widths" " " $j)
+        offset=$(index "$offsets" " " $j)
+        if [ $offset -eq $start ]
+        then
+            ordered_widths="$ordered_widths $width"
+            ordered_offsets="$ordered_offsets $offset"
+            start=`expr $start + $width`
+        fi
+    done
+done
+widths=$ordered_widths
+offsets=$ordered_offsets
+
+# store the windows maximized/fullscreen state information and undo all of it
 pattern='horz|vert|full' 
-screen_width=`xdpyinfo | awk '/dimensions:/ { print $2; exit }' | cut -d"x" -f1`
-display_width=`xdotool getdisplaygeometry | cut -d" " -f1`
 window_id=`xdotool getactivewindow`
 window_state=`xprop -id $window_id _NET_WM_STATE | sed 's/,//g' | cut -d ' ' -f3-`
 remember_states=""
@@ -17,32 +67,44 @@ do
         remember_states="$remember_states $w"
     fi
 done
+
+
+# get position of upper-left corner
 x=`xwininfo -id $window_id | awk '/Absolute upper-left X:/ { print $4 }'`
 y=`xwininfo -id $window_id | awk '/Absolute upper-left Y:/ { print $4 }'`
 
-# Subtract any offsets caused by panels or window decorations
-x_offset=`xwininfo -id $window_id | awk '/Relative upper-left X:/ { print $4 }'`
-y_offset=`xwininfo -id $window_id | awk '/Relative upper-left Y:/ { print $4 }'`
-x=`expr $x - $x_offset`
-y=`expr $y - $y_offset`
 
-# Compute new X position
-new_x=`expr $x + $display_width`
+# get the current monitor of the window, indexed from 1
+current_monitor=0
+for i in $(seq 1 $monitor_count)
+do
+    width=$(index "$widths" " " $i)
+    start=$(index "$offsets" " " $i)
+    end=`expr $start + $width`
+    if [ $x -ge $start ] && [ $x -lt $end ]
+    then
+        current_monitor=$i
+    fi
+done
 
-# If we would move off the right-most monitor, we set it to the left one.
-# We also respect the window's width here: moving a window off more than half its width won't happen.
-width=`xdotool getwindowgeometry $window_id | awk '/Geometry:/ { print $2 }'|cut -d"x" -f1`
-if [ `expr $new_x + $width / 2` -gt $screen_width ]; then
-  new_x=`expr $new_x - $screen_width`
-fi
 
-# Don't move off the left side.
-if [ $new_x -lt 0 ]; then
-  new_x=0
-fi
+# remember, monitors are indexed from 1, not 0, so this works
+next_monitor=`expr $current_monitor % $monitor_count`
+next_monitor=`expr $next_monitor + 1`
 
-# Move the window
+
+# compute new absolute x,y position based on relative positions and offsets
+current_offset=$(index "$offsets" " " $current_monitor)
+next_offset=$(index "$offsets" " " $next_monitor)
+x_rel=`expr $x - $current_offset`
+new_x=`expr $x_rel + $next_offset`
+
+
+# move the window to the same relative x,y position in the other monitor
 xdotool windowmove $window_id $new_x $y
+
+
+# restore maximized/fullscreen state
 for w in $remember_states
 do
     wmctrl -ir $window_id -b add,$w
