@@ -11,7 +11,7 @@
 # Neither of which worked quite right with fullscreen (distinct from maximized) windows
 #
 # Unfortunately it *is* necessary to remove the fullscreen property before moving.  For some reason, 
-# not doing so can lead to a window to switch back to its original monitor after alt+tab is pressed.
+# not doing so can lead to a window switching back to its original monitor after alt+tab is pressed.
 # Fortunately it can then be restored, but this leads to a visually unappealing move
 
 
@@ -106,10 +106,18 @@ done
 
 # remember, monitors are indexed from 1, not 0, so this works
 shift_by=1
-if [ $# -gt 0 ] && [ $0 =~ '[0-9]|-[0-9]' ]; then shift_by=$0; fi
-next_monitor=`expr $next_monitor + $shift_by`
-next_monitor=`expr $current_monitor % $monitor_count`
+numre='^-?[0-9]+$'
+if [ $# -gt 0 ] && [[ $1 =~ $nume ]]; then shift_by=$1; fi
+next_monitor=`expr $current_monitor + $shift_by`
+((next_monitor--))
+next_monitor=`expr $next_monitor % $monitor_count`
+while [ $next_monitor -lt 0 ] # since expr's modulus can give negative results
+do
+    next_monitor=`expr $next_monitor + $monitor_count`
+done
 ((next_monitor++))
+echo $current_monitor
+echo $next_monitor
 
 
 # compute new absolute x,y position based on relative positions and offsets
@@ -127,11 +135,8 @@ new_x=`expr $x_rel + $next_offset`
 
 resize=0
 
-echo $window_width $window_height
-echo $next_width $next_height
 if [ $next_width -lt $window_width ]
 then 
-    echo resizing x
     resize=1
     window_width=`expr $next_width - 30`
 fi
@@ -139,13 +144,9 @@ if [ $next_height -lt $window_height ]
 then 
     window_height=`expr $next_height - 30`
     resize=1
-    echo resizing y
 fi
 
-echo resizing on monitor $current_width $current_height to size $window_width $window_height on monitor $next_width $next_height
 if [ $resize -eq 1 ]; then xdotool windowsize $window_id $window_width $window_height; fi
-sleep .1
-echo done resizing
 
 
 # move the window to the same relative x,y position in the other monitor
