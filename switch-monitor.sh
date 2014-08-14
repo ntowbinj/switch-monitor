@@ -9,6 +9,10 @@
 # http://icyrock.com/blog/2012/05/xubuntu-moving-windows-between-monitors/
 #
 # Neither of which worked quite right with fullscreen (distinct from maximized) windows
+#
+# Unfortunately it *is* necessary to remove the fullscreen property before moving.  For some reason, 
+# not doing so can lead to a window to switch back to its original monitor after alt+tab is pressed.
+# Fortunately it can then be restored, but this leads to a visually unappealing move
 
 
 # since cut indexes from 1, pretty much everything in this script will too
@@ -22,12 +26,14 @@ function index {
 # if your screens (left to right) have widths W1, W2, W3, 
 # then you would set widths to "W1 W2 W3" and offsets to "0 W1 W2"
 widths=""
+heights=""
 offsets=""
 monitor_count=0
 while read -r line
 do
     info=`echo $line | sed -n 's/.* \([0-9]*x[0-9]*+[0-9]*+[0-9]*\).*/\1/p'`
     widths="$widths $(index $info 'x' 1)"
+    heights="$heights $(index $(index $info 'x' 2) '+' 1)"
     offsets="$offsets $(index $info '+' 2)"
     ((monitor_count++))
 done < <(xrandr --current | grep ' connected')
@@ -36,22 +42,26 @@ done < <(xrandr --current | grep ' connected')
 # put them in left-right order--computationally inefficient selection sort, but you probably don't have 100000 monitors
 start=0
 ordered_widths=""
+ordered_heights=""
 ordered_offsets=""
 for i in $(seq 1 $monitor_count)
 do
     for j in $(seq 1 $monitor_count)
     do
         width=$(index "$widths" " " $j)
+        height=$(index "$heights" " " $j)
         offset=$(index "$offsets" " " $j)
         if [ $offset -eq $start ]
         then
             ordered_widths="$ordered_widths $width"
+            ordered_heights="$ordered_heights $height"
             ordered_offsets="$ordered_offsets $offset"
             start=`expr $start + $width`
         fi
     done
 done
 widths=$ordered_widths
+heights=$ordered_heights
 offsets=$ordered_offsets
 
 # store the windows maximized/fullscreen state information and undo all of it
@@ -73,8 +83,11 @@ done
 
 
 # get position of upper-left corner
-x=`xwininfo -id $window_id | awk '/Absolute upper-left X:/ { print $4 }'`
-y=`xwininfo -id $window_id | awk '/Absolute upper-left Y:/ { print $4 }'`
+specs=`xwininfo -id $window_id`
+x=`echo "$specs" | awk '/Absolute upper-left X:/ { print $4 }'`
+y=`echo "$specs" | awk '/Absolute upper-left Y:/ { print $4 }'`
+window_width=`echo "$specs" | awk '/Width:/ { print $2 }'`
+window_height=`echo "$specs" | awk '/Height:/ { print $2 }'`
 
 
 # get the current monitor of the window, indexed from 1
@@ -92,15 +105,47 @@ done
 
 
 # remember, monitors are indexed from 1, not 0, so this works
+shift_by=1
+if [ $# -gt 0 ] && [ $0 =~ '[0-9]|-[0-9]' ]; then shift_by=$0; fi
+next_monitor=`expr $next_monitor + $shift_by`
 next_monitor=`expr $current_monitor % $monitor_count`
-next_monitor=`expr $next_monitor + 1`
+((next_monitor++))
 
 
 # compute new absolute x,y position based on relative positions and offsets
 current_offset=$(index "$offsets" " " $current_monitor)
 next_offset=$(index "$offsets" " " $next_monitor)
+
+current_width=$(index "$widths" " " $current_monitor)
+current_height=$(index "$heights" " " $current_monitor)
+
+next_width=$(index "$widths" " " $next_monitor)
+next_height=$(index "$heights" " " $next_monitor)
+
 x_rel=`expr $x - $current_offset`
 new_x=`expr $x_rel + $next_offset`
+
+resize=0
+
+echo $window_width $window_height
+echo $next_width $next_height
+if [ $next_width -lt $window_width ]
+then 
+    echo resizing x
+    resize=1
+    window_width=`expr $next_width - 30`
+fi
+if [ $next_height -lt $window_height ] 
+then 
+    window_height=`expr $next_height - 30`
+    resize=1
+    echo resizing y
+fi
+
+echo resizing on monitor $current_width $current_height to size $window_width $window_height on monitor $next_width $next_height
+if [ $resize -eq 1 ]; then xdotool windowsize $window_id $window_width $window_height; fi
+sleep .1
+echo done resizing
 
 
 # move the window to the same relative x,y position in the other monitor
