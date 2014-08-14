@@ -5,11 +5,11 @@ For some reason, in a number of distros, there is no built-in way to configure a
 
 In Mint, there are keyboard shortcut options for moving to an _edge_, which can be used to to move non-maximized window to the left edge of the left-most monitor or right edge of the right-most monitor.  However, there are limitations to this approach.
 
-There are other scripts floating around, but I have not found one that works quite right with F11 fullscreen (as opposed to _maximized_) windows, nor one that supports three or more monitors.  Also, this script should detect (horizontal) monitor sizes and left-right order for you. In the case of three or more monitors, it will cycle the window around the monitors (i.e., you can't specify a direction, though that would be a simple modification to make).
+There are other scripts floating around, but I have not found one that works quite right with F11 fullscreen (as opposed to _maximized_) windows, nor one that supports three or more monitors.  Also, this script should detect (horizontal) monitor sizes and left-right order for you. 
 
 
 # Usage
-running the script with no arguments will move the current window to the right.  Running it with a positive or negative integer argument will move it right or left by so many monitors:
+Running the script with no arguments will move the current window to the right.  Running it with a positive or negative integer argument will move it right or left by so many monitors:
 
 ```bash
 ./switch-monitor.sh -3
