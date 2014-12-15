@@ -19,7 +19,7 @@ Running the script with no arguments will move the current window to the right. 
 To install, place the script in a desired location, make sure it's executable:
 
 ```bash
-chmod +x switch-monitors.sh
+chmod +x switch-monitor.sh
 ```
 
 Then edit Keyboard Settings > Keyboard Shortcuts and add a custom shortcut that executes this script upon the desired keypressing, either by supplying an absolute path to the script or by putting the script on your PATH. I use Ctrl+m.  If you have more than one monitor and would like to move it in more than one direction, you could set up an alternate keypressing for the command "switch-monitor.sh -1".
